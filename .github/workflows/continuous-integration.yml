@@ -1,0 +1,47 @@
+name: CI
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - dependabot/**
+    tags:
+      - v[0-9]+\.[0-9]+\.[0-9]+
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.repository }}/${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: 17
+  NODE_VERSION: 16.14.2
+
+jobs:
+  compile_backend:
+    name: Compile all maven modules
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v4
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: adopt
+          java-version: ${{ env.JAVA_VERSION }}
+      - name: Cache maven dependencies
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-${{ env.CACHE_MAVEN_NAME }}-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-${{ env.CACHE_MAVEN_NAME }}
+      - name: Compile & build
+        run: |
+              chmod +x mvnw
+              ./mvnw -B -e -X install -DskipTests -Dasciidoctor.skip -Djacoco.skip
+      - name: Compile
+        run: mvn compile
+      - name: Run Demo Application
+        run: |
+          chmod +x mvnw
+          ./mvnw spring-boot:run
